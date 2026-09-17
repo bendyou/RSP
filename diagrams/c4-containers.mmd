@@ -1,0 +1,39 @@
+---
+title: Интеллектуальная панель управления серверами — C4 Container
+config:
+  theme: base
+  themeVariables:
+    fontFamily: Arial
+    fontSize: 16px
+  flowchart:
+    htmlLabels: false
+    curve: linear
+    nodeSpacing: 40
+    rankSpacing: 65
+---
+flowchart TB
+  admin["Администратор<br/>[Person]<br/>Настраивает систему и права"]
+  operator["Оператор / Наблюдатель<br/>[Person]<br/>Эксплуатация / просмотр"]
+  subgraph panel["[Software System] Интеллектуальная панель управления серверами"]
+    client["Веб-клиент<br/>[Container: React + TypeScript]<br/>Метрики, инциденты,<br/>рекомендации и операции"]
+    api["Backend API<br/>[Container: Python + FastAPI]<br/>Аутентификация, RBAC, приём метрик,<br/>управление серверами и операциями"]
+    worker["Фоновый обработчик<br/>[Container: Python]<br/>Проверка порогов, анализ аномалий,<br/>диспетчеризация операций"]
+    db[("База данных<br/>[Container: PostgreSQL]<br/>Конфигурация, метрики, инциденты,<br/>рекомендации, очередь операций, аудит")]
+    client -->|"Запросы; опрос раз в 10 с<br/>HTTPS / JSON"| api
+    api -->|"Чтение и запись<br/>SQL / TCP (TLS)"| db
+    worker -->|"Анализ и обработка очереди<br/>SQL / TCP (TLS)"| db
+  end
+  servers["Управляемые Linux-серверы<br/>[External Software System]<br/>Агент собирает метрики<br/>и исполняет разрешённые действия"]
+  admin -->|"Использует<br/>HTTPS"| client
+  operator -->|"Использует<br/>HTTPS"| client
+  servers -->|"Метрики раз в 30 с; опрос команд раз в 5 с;<br/>результаты операций; HTTPS / mTLS"| api
+  legend["Легенда<br/>Тёмный — человек; синий — контейнер; серый — внешняя система.<br/>Цилиндр — хранилище; пунктир — граница системы.<br/>Стрелка направлена от инициатора запроса; ответы подразумеваются."]
+  classDef person fill:#123b62,color:#fff,stroke:#123b62
+  classDef container fill:#2475aa,color:#fff,stroke:#123b62
+  classDef external fill:#687786,color:#fff,stroke:#465360
+  classDef note fill:#f1f5f9,color:#334155,stroke:#cbd5e1
+  class admin,operator person
+  class client,api,worker,db container
+  class servers external
+  class legend note
+  style panel fill:#fff,stroke:#8596a7,stroke-dasharray:6 6
