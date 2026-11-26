@@ -1,10 +1,10 @@
-from app.config.settings import load_settings
-from manage import run
+import os
+import sys
 
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.config")
+
+from django.core.management import execute_from_command_line
+from app.config import HTTP_PORT
 
 if __name__ == "__main__":
-    settings = load_settings()
-    bind = (
-        f"[{settings.http_host}]" if ":" in settings.http_host else settings.http_host
-    )
-    run(["runserver", f"{bind}:{settings.http_port}"])
+    execute_from_command_line([sys.argv[0], "runserver", f"127.0.0.1:{HTTP_PORT}"])
