@@ -1,4 +1,4 @@
-name: Laboratory checks
+name: Laboratory 3 checks
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  python:
+  backend:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -19,46 +19,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: |
-            lab2/requirements-validation.txt
-            lab3/requirements.txt
-      - run: python -m pip install -r lab2/requirements-validation.txt -r lab3/requirements.txt
-      - run: python lab2/validate.py
-      - run: python lab3/manage.py check
-      - run: python lab3/manage.py test tests --settings=app.config.test_settings
+          cache-dependency-path: requirements.txt
+      - run: python -m pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py test tests --settings=app.config.test_settings
       - run: python tools/check_docs.py
       - run: git diff --check
-
-  schema:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: local-ci-password
-          POSTGRES_DB: commandx_lab1
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      PGHOST: 127.0.0.1
-      PGPORT: '5432'
-      PGUSER: postgres
-      PGPASSWORD: local-ci-password
-      PGDATABASE: commandx_lab1
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.14'
-      - run: sudo apt-get update && sudo apt-get install -y graphviz postgresql-client
-      - run: python -m pip install -r lab1/requirements-validation.txt
-      - run: psql -v ON_ERROR_STOP=1 -f lab1/database/schema.sql
-      - run: python tools/check_schema.py --database-url postgresql://postgres:local-ci-password@127.0.0.1:5432/commandx_lab1
-      - run: dot -Tsvg lab1/diagrams/c4-containers.dot -o /tmp/c4.svg
-      - run: dot -Tsvg lab1/diagrams/erd.dot -o /tmp/erd.svg
