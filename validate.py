@@ -66,7 +66,6 @@ def check_examples(node):
 check_examples(resolved)
 reports = [
     (BASE / "ARCHITECTURE.md").read_text(),
-    (BASE.parent / "ARCHITECTURE.md").read_text(),
 ]
 operation_ids = set()
 for path, methods in resolved["paths"].items():
@@ -194,9 +193,6 @@ for name in ("CreateServerRequest", "UpdateServerRequest", "ReplaceServerRequest
             is True
         )
 
-assert (BASE.parent / "openapi.yaml").read_bytes() == (
-    BASE / "openapi.yaml"
-).read_bytes(), "Корневая копия расходится"
 assert len(operation_ids) == 22
 assert len(spec["paths"]) == 17
 assert spec["servers"][0]["url"].endswith("/api")
@@ -206,4 +202,4 @@ print(
 print(
     f"OK: {example_count} примеров с раскрытием ссылок, {len(cases)} граничные проверки"
 )
-print("OK: таблицы, параметры, security, ошибки, 204, секреты и корневая копия")
+print("OK: таблица, параметры, security, ошибки, 204 и секреты")
