@@ -1,26 +1,33 @@
-# CommandX · Лабораторная №1
+# CommandX · Лабораторные №1–№2
 
-**Разработка серверных приложений — архитектура и предметная область**
+**Разработка серверных приложений — архитектура и REST API**
 
-Панель управления собственными Linux-серверами по SSH. Технологическая основа: Django REST Framework, React/TypeScript, SQLite/PostgreSQL и Paramiko. Эта ветка содержит завершённую лабораторную №1.
+SSH-панель на Django REST Framework и React/TypeScript. Эта ветка продолжает №1 и содержит контракт №2, согласованный с реальным CommandX.
 
-[Полный отчёт](ARCHITECTURE.md) · [Каталог работы](lab1/README.md) · [Результаты проверки](docs/REVIEW.md) · [Контекст проекта](docs/PROJECT_CONTEXT.md)
+[Архитектура](ARCHITECTURE.md) · [OpenAPI](openapi.yaml) · [Отчёт №2](lab2/ARCHITECTURE.md) · [Проверки](docs/REVIEW.md)
 
-## Результат
+| № | Результат | Ветка |
+| --- | --- | --- |
+| 1 | [C4, ERD, 6 сущностей и PostgreSQL DDL](lab1/README.md) | [lab1](https://github.com/bendyou/RSP/tree/lab1) |
+| 2 | [22 операции, 17 путей, 31 схема и Swagger UI](lab2/README.md) | [lab2](https://github.com/bendyou/RSP/tree/lab2) |
 
-| Область | Выполнено |
-| --- | --- |
-| Роли и сценарии | Пользователь, администратор, гость; 11 Use Cases |
-| Архитектура | C4 Container: клиент, backend, БД, media и внешние системы |
-| Данные | 6 сущностей, 66 полей, 6 FK, ERD и описание 3НФ |
-| PostgreSQL | DDL 12 таблиц с auth-инфраструктурой, без пользовательских записей |
+## Swagger UI
 
-![CommandX — C4 Container](lab1/diagrams/c4-containers.svg)
+```sh
+python3 -m http.server 8082 --bind 127.0.0.1 --directory lab2
+```
 
-[ER-диаграмма](lab1/diagrams/erd.svg) · [SQL](lab1/database/schema.sql) · [Исходники и проверки](lab1/README.md).
+Откройте [http://127.0.0.1:8082/swagger.html](http://127.0.0.1:8082/swagger.html). Документация полностью локальная, отправка запросов отключена. API-сервер в этой ветке не реализован; маршруты описывают исходный CommandX и будущий health-check №3.
 
-## Организация
+## Проверка
 
-`lab1` — состояние для сдачи №1. Последующие работы продолжают CommandX отдельными ветками; `main` собирает завершённые этапы. Правила дальнейшей работы — в [AGENTS.md](AGENTS.md). Лабораторная №4 не выполняется без отдельного задания.
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r lab2/requirements-validation.txt
+.venv/bin/python lab2/validate.py
+.venv/bin/python tools/check_docs.py
+```
 
-SQL запускается только в отдельной пустой базе. Существующий исходный проект и его данные не изменяются. Виртуальные окружения, `.env`, ключи и архивы исключены из Git.
+OpenAPI 3.0.3, примеры, 33 граничных случая, таблицы и копии проверяются автоматически. [Снимки и результаты](lab2/VALIDATION.md). Схема БД проверяется отдельно по [инструкции №1](lab1/README.md).
+
+`lab2` включает №1–№2, `main` собирает завершённые этапы. Каркас №3 будет в следующей ветке; №4 не выполнялась. Следующий агент должен прочитать [AGENTS.md](AGENTS.md).

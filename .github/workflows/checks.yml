@@ -8,6 +8,23 @@ permissions:
   contents: read
 
 jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: lab2/requirements-validation.txt
+      - run: python -m pip install -r lab2/requirements-validation.txt
+      - run: python lab2/validate.py
+      - run: python tools/check_docs.py
+      - run: git diff --check
+
   schema:
     runs-on: ubuntu-latest
     services:
@@ -41,5 +58,3 @@ jobs:
       - run: python tools/check_schema.py --database-url postgresql://postgres:local-ci-password@127.0.0.1:5432/commandx_lab1
       - run: dot -Tsvg lab1/diagrams/c4-containers.dot -o /tmp/c4.svg
       - run: dot -Tsvg lab1/diagrams/erd.dot -o /tmp/erd.svg
-      - run: python tools/check_docs.py
-      - run: git diff --check

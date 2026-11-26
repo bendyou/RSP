@@ -211,3 +211,32 @@ DDL сформирован Django SchemaEditor из моделей без коп
 ## 8. Основания
 
 Модель подтверждена `backend/api/models.py` и миграциями `0001`–`0006`; роли и фильтр владельца — `backend/api/views.py`; маршруты — `backend/api/urls.py`, `backend/commandx/urls.py`. [Миграции Django](https://docs.djangoproject.com/en/5.2/topics/migrations/) управляют развитием схемы. [DRF APIView](https://www.django-rest-framework.org/api-guide/views/) определяет HTTP-слой, а [OpenAPI 3.0.3](https://spec.openapis.org/oas/v3.0.3.html) — формат контракта следующей работы.
+
+## 9. REST API Specs · лабораторная №2
+
+| Метод | URI | Назначение | Доступ | Коды ответа |
+| --- | --- | --- | --- | --- |
+| POST | `/api/auth/register/` | Зарегистрироваться и получить JWT | Все | 201, 400, 500 |
+| POST | `/api/auth/token/` | Войти по username и паролю | Все | 200, 400, 401, 500 |
+| POST | `/api/auth/token/refresh/` | Обновить access по refresh | Все | 200, 400, 401, 500 |
+| GET | `/api/auth/profile/` | Получить свой профиль | Пользователь | 200, 401, 500 |
+| PATCH | `/api/auth/profile/` | Изменить свой профиль | Пользователь | 200, 400, 401, 500 |
+| GET | `/api/servers/` | Получить свои серверы постранично | Пользователь | 200, 401, 404, 500 |
+| POST | `/api/servers/` | Добавить SSH-сервер | Пользователь | 201, 400, 401, 500 |
+| GET | `/api/servers/{id}/` | Прочитать свой сервер | Пользователь | 200, 401, 404, 500 |
+| PUT | `/api/servers/{id}/` | Обновить основные данные сервера | Пользователь | 200, 400, 401, 404, 500 |
+| PATCH | `/api/servers/{id}/` | Частично изменить сервер | Пользователь | 200, 400, 401, 404, 500 |
+| DELETE | `/api/servers/{id}/` | Удалить сервер | Пользователь | 204, 401, 404, 500 |
+| POST | `/api/servers/{id}/exec/` | Выполнить SSH-команду | Пользователь | 200, 400, 401, 403, 404, 500 |
+| POST | `/api/servers/{id}/test_connection/` | Проверить SSH-подключение | Пользователь | 200, 401, 403, 404, 500 |
+| POST | `/api/servers/{server_id}/toggle_status/` | Переключить доступ к серверу в панели | Пользователь | 200, 401, 404, 500 |
+| GET | `/api/servers/{id}/detailed_stats/` | Собрать текущие SSH-метрики | Пользователь | 200, 401, 403, 404, 500 |
+| GET | `/api/servers/{id}/metrics_history/` | Прочитать историю метрик | Пользователь | 200, 400, 401, 404, 500 |
+| POST | `/api/payment/deposit/` | Выполнить demo-пополнение | Пользователь | 200, 400, 401, 403, 500 |
+| POST | `/api/payment/buy-subscription/` | Купить подписку с баланса | Пользователь | 200, 400, 401, 500 |
+| GET | `/api/payment/transactions/` | Получить свои транзакции | Пользователь | 200, 401, 500 |
+| GET | `/api/admin/users/` | Получить пользователей панели | Администратор (is_staff) | 200, 401, 403, 500 |
+| POST | `/api/ai/chat/` | Получить ответ AI-помощника | Пользователь | 200, 400, 401, 500, 503 |
+| GET | `/api/health/` | Проверить процесс API | Все | 200 |
+
+[Полный отчёт №2](lab2/ARCHITECTURE.md) · [OpenAPI](openapi.yaml) · [Swagger UI](lab2/swagger.html). В лабораторной №3 реализуется только health-check; прочие маршруты — контракт исходного проекта.
