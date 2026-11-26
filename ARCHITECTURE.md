@@ -36,9 +36,9 @@ CommandX предоставляет веб-интерфейс для подкл�
 
 ## 4. C4 Container, уровень 2
 
-![C4 Container CommandX](lab1/diagrams/c4-containers.svg)
+![C4 Container CommandX](diagrams/c4-containers.svg)
 
-[Исходник Graphviz](lab1/diagrams/c4-containers.dot). Граница охватывает контейнеры CommandX; люди и внешние системы находятся снаружи. Контейнер C4 означает приложение/хранилище, а не обязательно Docker.
+[Исходник Graphviz](diagrams/c4-containers.dot). Граница охватывает контейнеры CommandX; люди и внешние системы находятся снаружи. Контейнер C4 означает приложение/хранилище, а не обязательно Docker.
 
 | Контейнер | Технологии | Ответственность |
 | --- | --- | --- |
@@ -53,9 +53,9 @@ CommandX предоставляет веб-интерфейс для подкл�
 
 Шесть основных сущностей: стандартный User и пять моделей приложения. Служебные таблицы Django auth (группы, permissions и связи N:M) не показаны на основной ERD; они включены в SQL для целостности схемы. Таблицы sessions, admin log, migrations и пользовательские данные в учебный экспорт не входят.
 
-![Физическая ER-диаграмма CommandX](lab1/diagrams/erd.svg)
+![Физическая ER-диаграмма CommandX](diagrams/erd.svg)
 
-[Исходник ERD](lab1/diagrams/erd.dot), [PostgreSQL DDL](lab1/database/schema.sql). PK — первичный ключ, FK — внешний ключ, UQ — уникальность, NN — NOT NULL. Собственные PK приложения — BIGINT; стандартный `auth_user.id` — INTEGER по миграциям Django. Это явно отмеченное отличие от рекомендуемого в задании BIGINT/UUID: замена типа встроенного User ради отчёта нарушила бы соответствие исходному проекту.
+[Исходник ERD](diagrams/erd.dot), [PostgreSQL DDL](database/schema.sql). PK — первичный ключ, FK — внешний ключ, UQ — уникальность, NN — NOT NULL. Собственные PK приложения — BIGINT; стандартный `auth_user.id` — INTEGER по миграциям Django. Это явно отмеченное отличие от рекомендуемого в задании BIGINT/UUID: замена типа встроенного User ради отчёта нарушила бы соответствие исходному проекту.
 
 ### Словарь данных
 
@@ -184,15 +184,15 @@ PK и UNIQUE создают индексы автоматически. У все
 Из корня репозитория, при установленном Graphviz:
 
 ```sh
-dot -Tsvg lab1/diagrams/c4-containers.dot -o lab1/diagrams/c4-containers.svg
-dot -Tsvg lab1/diagrams/erd.dot -o lab1/diagrams/erd.svg
+dot -Tsvg diagrams/c4-containers.dot -o diagrams/c4-containers.svg
+dot -Tsvg diagrams/erd.dot -o diagrams/erd.svg
 ```
 
 SQL предназначен **только для отдельной пустой PostgreSQL 16+**:
 
 ```sh
 createdb commandx_lab1
-psql -v ON_ERROR_STOP=1 -d commandx_lab1 -f lab1/database/schema.sql
+psql -v ON_ERROR_STOP=1 -d commandx_lab1 -f database/schema.sql
 ```
 
 DDL сформирован Django SchemaEditor из моделей без копирования записей, без SQL DEFAULT для обычных ORM defaults и без seed-аккаунтов. Это учебный снимок 12 таблиц с auth-инфраструктурой. В дальнейшем приложение должно использовать миграции Django; запуск SQL не заменяет `migrate`.
@@ -206,7 +206,7 @@ DDL сформирован Django SchemaEditor из моделей без коп
 | C4 Container, уровень 2 | SVG и исходник DOT, граница системы и внешние связи |
 | ERD в 3НФ | Физическая ERD, описание нормализации и ограничений |
 | PK/FK/NOT NULL/UNIQUE/CHECK/индексы | Описаны фактические гарантии ORM и БД; исключение INTEGER у стандартного User указано явно |
-| README и ARCHITECTURE в корне | Навигация и полный отчёт; исходники в lab1 |
+| README и ARCHITECTURE в корне | Навигация, полный отчёт и исходники в корне ветки lab1 |
 
 ## 8. Основания
 

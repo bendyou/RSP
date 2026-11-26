@@ -1,26 +1,26 @@
-# CommandX · Лабораторная №1
+# Лабораторная №1 · Архитектура CommandX
 
-**Разработка серверных приложений — архитектура и предметная область**
+Проектирование серверного приложения и предметной области существующей SSH-панели. Стек: Django REST Framework, React/TypeScript и SQLite/PostgreSQL.
 
-Панель управления собственными Linux-серверами по SSH. Технологическая основа: Django REST Framework, React/TypeScript, SQLite/PostgreSQL и Paramiko. Эта ветка содержит завершённую лабораторную №1.
-
-[Полный отчёт](ARCHITECTURE.md) · [Каталог работы](lab1/README.md) · [Результаты проверки](docs/REVIEW.md) · [Контекст проекта](docs/PROJECT_CONTEXT.md)
-
-## Результат
-
-| Область | Выполнено |
+| Результат | Файл |
 | --- | --- |
-| Роли и сценарии | Пользователь, администратор, гость; 11 Use Cases |
-| Архитектура | C4 Container: клиент, backend, БД, media и внешние системы |
-| Данные | 6 сущностей, 66 полей, 6 FK, ERD и описание 3НФ |
-| PostgreSQL | DDL 12 таблиц с auth-инфраструктурой, без пользовательских записей |
+| Роли, 11 Use Cases, C4, словарь данных и 3НФ | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| C4 Container | [SVG](diagrams/c4-containers.svg) · [DOT](diagrams/c4-containers.dot) |
+| ERD шести основных сущностей | [SVG](diagrams/erd.svg) · [DOT](diagrams/erd.dot) |
+| Физическая схема с auth-инфраструктурой | [PostgreSQL SQL](database/schema.sql) |
 
-![CommandX — C4 Container](lab1/diagrams/c4-containers.svg)
+Отчёт и остальные файлы работы находятся непосредственно в корне ветки. Ветка для сдачи — [lab1](https://github.com/bendyou/RSP/tree/lab1).
 
-[ER-диаграмма](lab1/diagrams/erd.svg) · [SQL](lab1/database/schema.sql) · [Исходники и проверки](lab1/README.md).
+Диаграммы можно читать без установки зависимостей. Команды Graphviz и создания схемы в отдельной пустой базе приведены в разделе 6 отчёта. Данные и секреты исходного проекта не копируются. SQL не следует применять к рабочей БД.
 
-## Организация
+## Проверка схемы
 
-`lab1` — состояние для сдачи №1. Последующие работы продолжают CommandX отдельными ветками; `main` собирает завершённые этапы. Правила дальнейшей работы — в [AGENTS.md](AGENTS.md). Лабораторная №4 не выполняется без отдельного задания.
+После создания отдельной учебной БД из SQL, из корня репозитория:
 
-SQL запускается только в отдельной пустой базе. Существующий исходный проект и его данные не изменяются. Виртуальные окружения, `.env`, ключи и архивы исключены из Git.
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-validation.txt
+.venv/bin/python tools/check_schema.py --database-url postgresql:///commandx_lab1
+```
+
+Проверка read-only: 12 таблиц с auth-инфраструктурой, 66 полей шести основных сущностей, 6 FK, ключи и индексы. [Машинный снимок моделей](database/model-snapshot.json) не содержит пользовательских записей.

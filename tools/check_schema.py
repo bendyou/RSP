@@ -6,11 +6,11 @@ import psycopg2
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(
-    description="Проверка отдельной учебной PostgreSQL после применения lab1/database/schema.sql"
+    description="Проверка отдельной учебной PostgreSQL после применения database/schema.sql"
 )
 parser.add_argument("--database-url", required=True)
 args = parser.parse_args()
-models = json.loads((ROOT / "lab1/database/model-snapshot.json").read_text())
+models = json.loads((ROOT / "database/model-snapshot.json").read_text())
 field_count = 0
 foreign_keys = 0
 with psycopg2.connect(args.database_url) as connection:
