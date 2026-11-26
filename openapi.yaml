@@ -1,0 +1,1912 @@
+openapi: 3.0.3
+info:
+  title: CommandX API
+  version: 1.0.0
+  description: Контракт CommandX из ЛР2, сохранённый для каркаса ЛР3 по методичке. Сейчас реализованы только GET
+    /api/v1/health, GET /health и совместимый GET /api/health/. Остальные операции описывают исходный проект и дальнейшие
+    этапы, x-lab3-implemented=false. Основной API сохраняет /api/ и завершающий слеш; исключение /api/v1/health
+    требуется заданием ЛР3. JWT и CRUD в каркасе пока отсутствуют.
+servers:
+- url: http://127.0.0.1:8000
+  description: Локальный каркас CommandX; порт переопределяется HTTP_PORT в .env
+tags:
+- name: Auth
+  description: Регистрация, JWT и свой профиль
+- name: Servers
+  description: Собственные SSH-серверы
+- name: Monitoring
+  description: Метрики по запросу и история
+- name: Payments
+  description: Баланс и подписка, без эквайринга
+- name: Admin
+  description: Доступ is_staff
+- name: AI
+  description: Опциональный помощник
+- name: Service
+  description: 'Health-check ЛР3: /api/v1/health и совместимые алиасы'
+security:
+- bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 150
+        email:
+          type: string
+          description: 'Проверка исходника: непустой email с @ и точкой после @; дополнительно проверяется существование.'
+        password:
+          type: string
+          minLength: 8
+          writeOnly: true
+        password_confirm:
+          type: string
+          minLength: 1
+          writeOnly: true
+          description: Должен совпадать с password; сравнивает приложение.
+      required:
+      - username
+      - email
+      - password
+      - password_confirm
+      example:
+        username: student
+        email: student@example.com
+        password: Example-pass-2026!
+        password_confirm: Example-pass-2026!
+    RegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        access:
+          type: string
+        refresh:
+          type: string
+      required:
+      - message
+      - username
+      - email
+      - access
+      - refresh
+    TokenRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+          writeOnly: true
+      required:
+      - username
+      - password
+    TokenPairResponse:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    RefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          writeOnly: true
+      required:
+      - refresh
+    AccessResponse:
+      type: object
+      properties:
+        access:
+          type: string
+      required:
+      - access
+    ProfileResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        username:
+          type: string
+        email:
+          type: string
+        date_joined:
+          type: string
+          format: date-time
+          nullable: true
+        avatar:
+          type: string
+          nullable: true
+        email_verified:
+          type: boolean
+        balance:
+          type: number
+          format: double
+          description: 'Совместимость с исходником: JSON number из float(Decimal), в БД numeric(10,2).'
+        is_staff:
+          type: boolean
+        subscription_type:
+          type: string
+          enum:
+          - none
+          - pro
+          - plus
+        subscription_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        has_active_subscription:
+          type: boolean
+      required:
+      - id
+      - username
+      - email
+      - date_joined
+      - avatar
+      - email_verified
+      - balance
+      - is_staff
+      - subscription_type
+      - subscription_expires_at
+      - has_active_subscription
+    ProfilePatchRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 150
+        email:
+          type: string
+        avatar:
+          type: string
+          nullable: true
+          description: 'В JSON: null или пустая строка для удаления; загрузка файла — multipart/form-data.'
+      description: Исходник игнорирует часть неверных полей; схема описывает корректный клиентский запрос. Баланс
+        и роль здесь не изменяются.
+    CreateServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        host:
+          type: string
+          minLength: 1
+          maxLength: 255
+        port:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 65535
+          default: 22
+        username:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Учётная запись SSH, не username пользователя панели.
+        auth_type:
+          type: string
+          enum:
+          - password
+          - private_key
+          default: password
+        password:
+          type: string
+          maxLength: 255
+          writeOnly: true
+          description: SSH-пароль; требуется при auth_type=password, если ещё не сохранён.
+        private_key:
+          type: string
+          writeOnly: true
+          description: Приватный SSH-ключ; обязателен при auth_type=private_key, если ещё не сохранён.
+        passphrase:
+          type: string
+          maxLength: 255
+          writeOnly: true
+        is_active:
+          type: boolean
+          default: true
+          description: Доступ в панели; не состояние питания ОС.
+      required:
+      - name
+      - host
+      - username
+      anyOf:
+      - properties:
+          auth_type:
+            type: string
+            enum:
+            - password
+          password:
+            type: string
+            minLength: 1
+        required:
+        - password
+      - properties:
+          auth_type:
+            type: string
+            enum:
+            - private_key
+          private_key:
+            type: string
+            minLength: 1
+        required:
+        - auth_type
+        - private_key
+      example:
+        name: Учебный VPS
+        host: server.example.com
+        username: student
+        auth_type: password
+        password: Example-ssh-pass!
+    UpdateServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        host:
+          type: string
+          minLength: 1
+          maxLength: 255
+        port:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 65535
+          default: 22
+        username:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Учётная запись SSH, не username пользователя панели.
+        auth_type:
+          type: string
+          enum:
+          - password
+          - private_key
+          default: password
+        password:
+          type: string
+          maxLength: 255
+          writeOnly: true
+          description: SSH-пароль; требуется при auth_type=password, если ещё не сохранён.
+        private_key:
+          type: string
+          writeOnly: true
+          description: Приватный SSH-ключ; обязателен при auth_type=private_key, если ещё не сохранён.
+        passphrase:
+          type: string
+          maxLength: 255
+          writeOnly: true
+        is_active:
+          type: boolean
+          default: true
+          description: Доступ в панели; не состояние питания ОС.
+      description: PATCH допускает частичное и пустое обновление. Не переданные секреты сохраняются. Для смены типа
+        SSH-аутентификации нужны соответствующие реквизиты, если они ещё не сохранены.
+    ReplaceServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        host:
+          type: string
+          minLength: 1
+          maxLength: 255
+        port:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 65535
+          default: 22
+        username:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Учётная запись SSH, не username пользователя панели.
+        auth_type:
+          type: string
+          enum:
+          - password
+          - private_key
+          default: password
+        password:
+          type: string
+          maxLength: 255
+          writeOnly: true
+          description: SSH-пароль; требуется при auth_type=password, если ещё не сохранён.
+        private_key:
+          type: string
+          writeOnly: true
+          description: Приватный SSH-ключ; обязателен при auth_type=private_key, если ещё не сохранён.
+        passphrase:
+          type: string
+          maxLength: 255
+          writeOnly: true
+        is_active:
+          type: boolean
+          default: true
+          description: Доступ в панели; не состояние питания ОС.
+      required:
+      - name
+      - host
+      - username
+      description: PUT требует основные поля. Не переданные необязательные поля DRF может сохранить; это особенность
+        существующего serializer.update, а не обещание полного сброса всех полей.
+    ServerListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        host:
+          type: string
+          minLength: 1
+          maxLength: 255
+        port:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 65535
+          default: 22
+        username:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Учётная запись SSH, не username пользователя панели.
+        auth_type:
+          type: string
+          enum:
+          - password
+          - private_key
+          default: password
+        is_active:
+          type: boolean
+          default: true
+          description: Доступ в панели; не состояние питания ОС.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - host
+      - port
+      - username
+      - auth_type
+      - is_active
+      - created_at
+      - updated_at
+      example:
+        id: 1
+        name: Учебный VPS
+        host: server.example.com
+        port: 22
+        username: student
+        auth_type: password
+        is_active: true
+        created_at: '2026-11-26T09:00:00Z'
+        updated_at: '2026-11-26T09:00:00Z'
+    ServerResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        host:
+          type: string
+          minLength: 1
+          maxLength: 255
+        port:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 65535
+          default: 22
+        username:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Учётная запись SSH, не username пользователя панели.
+        auth_type:
+          type: string
+          enum:
+          - password
+          - private_key
+          default: password
+        is_active:
+          type: boolean
+          default: true
+          description: Доступ в панели; не состояние питания ОС.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type: integer
+          format: int64
+          nullable: true
+      required:
+      - id
+      - name
+      - host
+      - port
+      - username
+      - auth_type
+      - is_active
+      - created_at
+      - updated_at
+      - created_by
+      example:
+        id: 1
+        name: Учебный VPS
+        host: server.example.com
+        port: 22
+        username: student
+        auth_type: password
+        is_active: true
+        created_at: '2026-11-26T09:00:00Z'
+        updated_at: '2026-11-26T09:00:00Z'
+        created_by: 1
+    ServerPageResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+          minimum: 0
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServerListItem'
+      required:
+      - count
+      - next
+      - previous
+      - results
+      example:
+        count: 1
+        next: null
+        previous: null
+        results:
+        - id: 1
+          name: Учебный VPS
+          host: server.example.com
+          port: 22
+          username: student
+          auth_type: password
+          is_active: true
+          created_at: '2026-11-26T09:00:00Z'
+          updated_at: '2026-11-26T09:00:00Z'
+    CommandRequest:
+      type: object
+      properties:
+        command:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required:
+      - command
+      example:
+        command: uname -a
+    CommandResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        exit_code:
+          type: integer
+        stdout:
+          type: string
+        stderr:
+          type: string
+      required:
+      - success
+      - exit_code
+      - stdout
+      - stderr
+      example:
+        success: true
+        exit_code: 0
+        stdout: 'Linux
+
+          '
+        stderr: ''
+    ConnectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+      - success
+      - message
+    ToggleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        is_active:
+          type: boolean
+      required:
+      - success
+      - message
+      - is_active
+    MetricResponse:
+      type: object
+      properties:
+        cpu_percent:
+          type: number
+          format: double
+          nullable: true
+        memory_percent:
+          type: number
+          format: double
+          nullable: true
+        memory_used_mb:
+          type: number
+          format: double
+          nullable: true
+        memory_total_mb:
+          type: number
+          format: double
+          nullable: true
+        disk_percent:
+          type: number
+          format: double
+          nullable: true
+        disk_used_gb:
+          type: number
+          format: double
+          nullable: true
+        disk_total_gb:
+          type: number
+          format: double
+          nullable: true
+        message:
+          type: string
+      required:
+      - cpu_percent
+      - memory_percent
+      - memory_used_mb
+      - memory_total_mb
+      - disk_percent
+      - disk_used_gb
+      - disk_total_gb
+      example:
+        cpu_percent: null
+        memory_percent: null
+        memory_used_mb: null
+        memory_total_mb: null
+        disk_percent: null
+        disk_used_gb: null
+        disk_total_gb: null
+    MetricHistoryItem:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        cpu_percent:
+          type: number
+          format: double
+          nullable: true
+        memory_percent:
+          type: number
+          format: double
+          nullable: true
+        memory_used_mb:
+          type: number
+          format: double
+          nullable: true
+        memory_total_mb:
+          type: number
+          format: double
+          nullable: true
+        disk_percent:
+          type: number
+          format: double
+          nullable: true
+        disk_used_gb:
+          type: number
+          format: double
+          nullable: true
+        disk_total_gb:
+          type: number
+          format: double
+          nullable: true
+      required:
+      - timestamp
+      - cpu_percent
+      - memory_percent
+      - memory_used_mb
+      - memory_total_mb
+      - disk_percent
+      - disk_used_gb
+      - disk_total_gb
+    DepositRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+          maximum: 1000000
+          multipleOf: 0.01
+      required:
+      - amount
+    BalanceResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        balance:
+          type: number
+          format: double
+          description: 'Совместимость с исходником: JSON number из float(Decimal), в БД numeric(10,2).'
+      required:
+      - message
+      - balance
+    SubscriptionRequest:
+      type: object
+      properties:
+        subscription_type:
+          type: string
+          enum:
+          - pro
+          - plus
+      required:
+      - subscription_type
+    SubscriptionResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        subscription_type:
+          type: string
+          enum:
+          - pro
+          - plus
+        expires_at:
+          type: string
+          format: date-time
+        balance:
+          type: number
+          format: double
+          description: 'Совместимость с исходником: JSON number из float(Decimal), в БД numeric(10,2).'
+      required:
+      - message
+      - subscription_type
+      - expires_at
+      - balance
+    TransactionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        type:
+          type: string
+          enum:
+          - deposit
+          - subscription_pro
+          - subscription_plus
+          - admin_grant
+        type_display:
+          type: string
+        amount:
+          type: number
+          format: double
+          description: 'Совместимость с исходником: JSON number из float(Decimal), в БД numeric(10,2).'
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - type
+      - type_display
+      - amount
+      - description
+      - created_at
+    AIMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+        content:
+          type: string
+          minLength: 1
+          maxLength: 12000
+      required:
+      - role
+      - content
+    AIRequest:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AIMessage'
+          minItems: 1
+          maxItems: 40
+        serverId:
+          type: integer
+          format: int64
+          minimum: 1
+        serverType:
+          type: string
+          enum:
+          - ssh
+          - allocated
+      required:
+      - messages
+      description: serverId/serverType принимаются для совместимости клиента, но исходный ai_chat не использует
+        их для чтения сервера и не запускает команды.
+    AIResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        response:
+          type: string
+      required:
+      - success
+      - response
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - pass
+        app_name:
+          type: string
+        version:
+          type: string
+        environment:
+          type: string
+        uptime_seconds:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - status
+      - app_name
+      - version
+      - environment
+      - uptime_seconds
+      example:
+        status: pass
+        app_name: CommandX
+        version: 1.0.0
+        environment: development
+        uptime_seconds: 0
+    ErrorResponse:
+      type: object
+      minProperties: 1
+      additionalProperties: true
+      description: 'Общая совместимая схема JSON-ошибок: DRF detail/code, собственные error/message/success и словари
+        ошибок полей. Не вводит выдуманный единый envelope.'
+      properties:
+        detail:
+          type: string
+        code:
+          type: string
+        error:
+          type: string
+        message:
+          type: string
+        success:
+          type: boolean
+        details:
+          type: string
+          nullable: true
+      example:
+        detail: Учетные данные не были предоставлены.
+    AdminUserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        username:
+          type: string
+        email:
+          type: string
+        date_joined:
+          type: string
+          format: date-time
+          nullable: true
+        avatar:
+          type: string
+          nullable: true
+        email_verified:
+          type: boolean
+        balance:
+          type: number
+          format: double
+          description: 'Совместимость с исходником: JSON number из float(Decimal), в БД numeric(10,2).'
+        is_staff:
+          type: boolean
+        subscription_type:
+          type: string
+          enum:
+          - none
+          - pro
+          - plus
+        subscription_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        has_active_subscription:
+          type: boolean
+        is_active:
+          type: boolean
+      required:
+      - id
+      - username
+      - email
+      - date_joined
+      - avatar
+      - email_verified
+      - balance
+      - is_staff
+      - subscription_type
+      - subscription_expires_at
+      - has_active_subscription
+      - is_active
+paths:
+  /api/auth/register/:
+    post:
+      tags:
+      - Auth
+      summary: Зарегистрироваться и получить JWT
+      operationId: register
+      description: Создаёт User и UserProfile. Дубли username/email и несовпадение паролей дают 400, не 409. Проверки
+        пароля дополнены валидаторами Django; все их правила в JSON Schema не выражены.
+      x-access-role: Все
+      x-lab3-implemented: false
+      responses:
+        '201':
+          description: Ресурс создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      security: []
+  /api/auth/token/:
+    post:
+      tags:
+      - Auth
+      summary: Войти по username и паролю
+      operationId: obtainToken
+      description: Возвращает access (1 час) и refresh (7 дней). По email вход не реализован.
+      x-access-role: Все
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      security: []
+  /api/auth/token/refresh/:
+    post:
+      tags:
+      - Auth
+      summary: Обновить access по refresh
+      operationId: refreshToken
+      description: Обновить access по refresh
+      x-access-role: Все
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      security: []
+  /api/auth/profile/:
+    get:
+      tags:
+      - Auth
+      summary: Получить свой профиль
+      operationId: getProfile
+      description: Получить свой профиль
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+      - Auth
+      summary: Изменить свой профиль
+      operationId: patchProfile
+      description: JSON изменяет username/email и удаляет avatar через null/пустую строку. Загрузка аватара возможна
+        multipart/form-data. Неверные короткие имена исходник может игнорировать; duplicate username/email — 400.
+        Роль, баланс и подписку здесь менять нельзя.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePatchRequest'
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 150
+                email:
+                  type: string
+                avatar:
+                  type: string
+                  format: binary
+  /api/servers/:
+    get:
+      tags:
+      - Servers
+      summary: Получить свои серверы постранично
+      operationId: listServers
+      description: Только created_by=current_user, даже для is_staff. PageNumberPagination, размер 20, порядок -created_at.
+        Несуществующая/неверная страница — 404; query-поиск/фильтрация исходником не реализованы.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerPageResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+          default: 1
+    post:
+      tags:
+      - Servers
+      summary: Добавить SSH-сервер
+      operationId: createServer
+      description: created_by берётся из JWT. name/host/SSH username обязательны; port=22, auth_type=password, is_active=true
+        по умолчанию. При password нужны непустые реквизиты; для private_key нужен ключ. Пароль, ключ и passphrase
+        write_only; сохранение карточки не доказывает доступность SSH.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '201':
+          description: Ресурс создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServerRequest'
+  /api/servers/{id}/:
+    get:
+      tags:
+      - Servers
+      summary: Прочитать свой сервер
+      operationId: getServer
+      description: Объект доступен только владельцу; чужой — 404. Эти операции разрешены и для приостановленного
+        сервера. Изменение/удаление закрывает сохранённое SSH-соединение; удаление каскадно удаляет метрики через
+        ORM.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    put:
+      tags:
+      - Servers
+      summary: Обновить основные данные сервера
+      operationId: replaceServer
+      description: Объект доступен только владельцу; чужой — 404. Эти операции разрешены и для приостановленного
+        сервера. Изменение/удаление закрывает сохранённое SSH-соединение; удаление каскадно удаляет метрики через
+        ORM.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceServerRequest'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    patch:
+      tags:
+      - Servers
+      summary: Частично изменить сервер
+      operationId: patchServer
+      description: Объект доступен только владельцу; чужой — 404. Эти операции разрешены и для приостановленного
+        сервера. Изменение/удаление закрывает сохранённое SSH-соединение; удаление каскадно удаляет метрики через
+        ORM.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateServerRequest'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+    delete:
+      tags:
+      - Servers
+      summary: Удалить сервер
+      operationId: deleteServer
+      description: Объект доступен только владельцу; чужой — 404. Эти операции разрешены и для приостановленного
+        сервера. Изменение/удаление закрывает сохранённое SSH-соединение; удаление каскадно удаляет метрики через
+        ORM.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '204':
+          description: Удалено, без тела
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+  /api/servers/{id}/exec/:
+    post:
+      tags:
+      - Servers
+      summary: Выполнить SSH-команду
+      operationId: executeCommand
+      description: Команда исполняется с правами SSH-пользователя, не в sandbox. Ненулевой exit_code возвращается
+        с HTTP 200 и success=false. Лимит ожидания 30 секунд и вывода 4 МиБ; автоматического повтора после сбоя
+        нет. Приостановленный сервер — 403.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав или доступ приостановлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+  /api/servers/{id}/test_connection/:
+    post:
+      tags:
+      - Servers
+      summary: Проверить SSH-подключение
+      operationId: testConnection
+      description: SSH host key должен быть заранее доверенным. Неудачная проверка может вернуть HTTP 200 с success=false;
+        исключение — 500. Не путать с health-check процесса API.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав или доступ приостановлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+  /api/servers/{server_id}/toggle_status/:
+    post:
+      tags:
+      - Servers
+      summary: Переключить доступ к серверу в панели
+      operationId: toggleServerAccess
+      description: Меняет is_active на противоположное; повтор неидемпотентен. Не выключает ОС. Прямая view фильтрует
+        created_by; может снова включить приостановленный сервер.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToggleResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: server_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+  /api/servers/{id}/detailed_stats/:
+    get:
+      tags:
+      - Monitoring
+      summary: Собрать текущие SSH-метрики
+      operationId: getDetailedStats
+      description: Переиспользует сэмпл не старше 5 секунд либо собирает SSH-метрики и пытается сохранить их. Неизвестные
+        величины — null, не 0. Возможна техническая запись сэмпла при GET; бизнес-ресурсы пользователя не изменяются.
+        При недоступных командах возможен 200 с null-полями и message.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав или доступ приостановлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+  /api/servers/{id}/metrics_history/:
+    get:
+      tags:
+      - Monitoring
+      summary: Прочитать историю метрик
+      operationId: getMetricsHistory
+      description: Существующие сэмплы за hours; до 2000 последних, ответ по времени ASC. Сбор SSH не запускается;
+        разрешено при is_active=false. Время — timestamp; сетевые поля legacy-метрик в этот ответ не входят.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetricHistoryItem'
+                maxItems: 2000
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Не найдено или чужой сервер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+      - name: hours
+        in: query
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 168
+          default: 1
+  /api/payment/deposit/:
+    post:
+      tags:
+      - Payments
+      summary: Выполнить demo-пополнение
+      operationId: depositBalance
+      description: Не реальная оплата. По умолчанию ENABLE_DEMO_PAYMENTS=false и ответ 403. При явном включении
+        сумма 0 < amount ≤ 1000000 с двумя десятичными знаками; баланс и Transaction меняются в транзакции.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав или доступ приостановлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepositRequest'
+  /api/payment/buy-subscription/:
+    post:
+      tags:
+      - Payments
+      summary: Купить подписку с баланса
+      operationId: buySubscription
+      description: Списывает текущую цену pro=200 либо plus=1000, создаёт Transaction и устанавливает срок now+30
+        дней (не продлевает от старой даты). Недостаточно средств — 400. Цены описывают снимок исходного кода, не
+        предложение услуги.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRequest'
+  /api/payment/transactions/:
+    get:
+      tags:
+      - Payments
+      summary: Получить свои транзакции
+      operationId: listTransactions
+      description: Обычный массив без пагинации, -created_at. В ответе поле type соответствует transaction_type
+        модели. amount — положительная сумма операции; тип определяет её смысл, это не знаковый ledger.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/users/:
+    get:
+      tags:
+      - Admin
+      summary: Получить пользователей панели
+      operationId: listAdminUsers
+      description: Только is_staff. Массив без пагинации. Не предоставляет доступ к SSH-секретам или чужим SSH-серверам.
+      x-access-role: Администратор (is_staff)
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminUserResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав или доступ приостановлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/ai/chat/:
+    post:
+      tags:
+      - AI
+      summary: Получить ответ AI-помощника
+      operationId: chatWithAI
+      description: Нужны текстовые messages. При отсутствии ключа — 503. serverId/serverType не приводят к выполнению
+        SSH или чтению сервера. Запрос внешнего сервиса не повторяется автоматически.
+      x-access-role: Пользователь
+      x-lab3-implemented: false
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIResponse'
+        '400':
+          description: Ошибка входных данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Нет действующего JWT / неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка обработки; необработанное исключение Django может вернуть HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: AI не настроен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIRequest'
+  /api/v1/health:
+    get:
+      tags:
+      - Service
+      summary: Проверить здоровье CommandX (маршрут сдачи ЛР3)
+      operationId: getHealth
+      description: Основной маршрут сдачи по методичке ЛР3. Проверяет только процесс CommandX; без БД, SSH, JWT
+        и AI. Время работы — целые секунды с создания HealthService.
+      x-access-role: Все
+      x-lab3-implemented: true
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+      security: []
+  /health:
+    get:
+      tags:
+      - Service
+      summary: Проверить здоровье CommandX (алиас)
+      operationId: getShortHealth
+      description: Короткий маршрут проверки, допускаемый методичкой ЛР3.
+      x-access-role: Все
+      x-lab3-implemented: true
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+      security: []
+  /api/health/:
+    get:
+      tags:
+      - Service
+      summary: Проверить здоровье CommandX (алиас)
+      operationId: getLegacyHealth
+      description: Совместимый маршрут из исходного контракта ЛР2; ответ тот же, без перенаправления.
+      x-access-role: Все
+      x-lab3-implemented: true
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+      security: []

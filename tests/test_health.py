@@ -1,16 +1,15 @@
-from pathlib import Path
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
 from django.urls import reverse
 
-from app.config.settings import load_settings
 from app.controller.health import HealthView
-from app.service.health import HealthService
+from app.service.health import HealthService, ServiceInfo
 
 
 class HealthTests(SimpleTestCase):
     def test_public_health_without_database(self):
+        self.assertEqual(reverse("health"), "/api/v1/health")
         response = self.client.get(reverse("health"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["Content-Type"], "application/json")
@@ -24,11 +23,15 @@ class HealthTests(SimpleTestCase):
         self.assertIsInstance(payload["uptime_seconds"], int)
         self.assertGreaterEqual(payload["uptime_seconds"], 0)
 
-    def test_invalid_bearer_does_not_block_public_health(self):
-        response = self.client.get(
-            reverse("health"), HTTP_AUTHORIZATION="Bearer invalid-demo-token"
-        )
-        self.assertEqual(response.status_code, 200)
+    def test_aliases_return_json_without_authentication_or_redirect(self):
+        for path in ("/api/v1/health", "/health", "/api/health/"):
+            with self.subTest(path=path):
+                response = self.client.get(
+                    path, HTTP_AUTHORIZATION="Bearer invalid-demo-token"
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.headers["Content-Type"], "application/json")
+                self.assertNotIn("Location", response.headers)
 
     def test_write_is_not_allowed(self):
         self.assertEqual(
@@ -42,12 +45,21 @@ class HealthTests(SimpleTestCase):
         self.assertEqual(self.client.get("/api/servers/").status_code, 404)
 
     def test_service_uses_monotonic_time(self):
-        settings = load_settings(
-            environ={}, env_file=Path("/nonexistent-commandx-test-env")
-        )
         with patch("app.service.health.monotonic", side_effect=[100.5, 104.9]):
-            service = HealthService(settings)
+            service = HealthService(ServiceInfo("CommandX", "1.0.0", "test"))
             self.assertEqual(service.get_status()["uptime_seconds"], 4)
+
+    def test_head_has_no_body(self):
+        response = self.client.head("/api/v1/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"")
+
+    def test_health_does_not_expose_configuration_secrets(self):
+        from django.conf import settings
+
+        response = self.client.get("/api/v1/health")
+        self.assertNotIn(settings.SECRET_KEY, response.content.decode())
+        self.assertNotIn("database_url", response.json())
 
     def test_controller_accepts_explicit_service(self):
         from rest_framework.test import APIRequestFactory

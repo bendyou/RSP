@@ -16,6 +16,9 @@ staticfiles/
 node_modules/
 build/
 dist/
+bin/
+*.exe
+*.bin
 .idea/
 .vscode/
 .DS_Store

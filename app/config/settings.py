@@ -6,7 +6,6 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
-DEV_SECRET = "commandx-local-development-key-do-not-deploy"
 
 
 @dataclass(frozen=True)
@@ -60,12 +59,10 @@ def load_settings(
     )
     if not allowed_hosts:
         raise ValueError("ALLOWED_HOSTS должен содержать хотя бы один hostname")
-    secret_key = value("DJANGO_SECRET_KEY", DEV_SECRET)
-    if (app_env == "production" or not debug) and (
-        secret_key == DEV_SECRET or len(secret_key) < 32
-    ):
+    secret_key = value("DJANGO_SECRET_KEY", "")
+    if len(secret_key) < 32:
         raise ValueError(
-            "При DEBUG=false или APP_ENV=production нужен собственный DJANGO_SECRET_KEY длиной от 32 символов"
+            "DJANGO_SECRET_KEY должен содержать собственный секрет длиной от 32 символов"
         )
     if app_env == "production" and debug:
         raise ValueError("В production DEBUG должен быть false")
