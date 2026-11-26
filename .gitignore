@@ -1,9 +1,6 @@
-# Local configuration and secrets
 .env
 .env.*
 !.env.example
-
-# Python
 .venv/
 venv/
 __pycache__/
@@ -12,16 +9,19 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
+*.sqlite3
+*.sqlite3-*
+media/
+staticfiles/
+node_modules/
 build/
 dist/
-
-# IDE and OS
 .idea/
 .vscode/
 .DS_Store
-
-# Other build tools
-node_modules/
-bin/
-*.exe
-*.bin
+*.log
+*.rar
+*.zip
+coverage.xml
+.coverage
+htmlcov/
